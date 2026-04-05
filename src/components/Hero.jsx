@@ -24,7 +24,7 @@ const Hero = () => {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-brand-gold font-medium tracking-[0.3em] uppercase mb-4 text-sm md:text-base"
         >
-          Welcome to Naaz Pardha
+          Welcome to Naaz Pardha & Ladies Garments
         </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
