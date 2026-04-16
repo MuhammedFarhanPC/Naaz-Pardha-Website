@@ -1,21 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { db } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 const Collection = () => {
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "products"), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      setCollections(data);
-      setLoading(false);
-    });
+    const fetchProducts = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        setCollections(data);
+      } catch (error) {
+        console.error("Error fetching products: ", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsub();
+    fetchProducts();
   }, []);
 
   return (

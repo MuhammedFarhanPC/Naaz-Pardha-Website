@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 const Gallery = () => {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -10,14 +10,20 @@ const Gallery = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "gallery"), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      setGalleryImages(data.map(item => item.image));
-      setLoading(false);
-    });
+    const fetchGallery = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "gallery"));
+        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        setGalleryImages(data.map(item => item.image));
+      } catch (error) {
+        console.error("Error fetching gallery: ", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => unsub();
+    fetchGallery();
   }, []);
 
   return (
