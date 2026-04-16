@@ -5,7 +5,6 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
-import { collectionsDB, galleryDB } from './db';
 
 function App() {
   return (

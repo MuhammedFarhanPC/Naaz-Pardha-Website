@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { collectionsDB, galleryDB, initDB, fileToBase64 } from '../db';
+import { fileToBase64 } from '../db';
+import { db } from '../firebase';
+import { collection, addDoc, deleteDoc, doc, setDoc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 import { LogOut, Image as ImageIcon, Package, Trash2, Edit3, Plus, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -22,26 +24,26 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    loadData(true);
+    // Real-time listener for products
+    const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
+      const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      prods.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by newest
+      setProducts(prods);
+      setLoading(false);
+    });
+
+    // Real-time listener for gallery
+    const unsubGallery = onSnapshot(collection(db, "gallery"), (snapshot) => {
+      const gals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      gals.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setGallery(gals);
+    });
+
+    return () => {
+      unsubProducts();
+      unsubGallery();
+    };
   }, []);
-
-  const loadData = async (isInitial = false) => {
-    if (isInitial) setLoading(true);
-    await initDB();
-    
-    const colData = [];
-    await collectionsDB.iterate((value, key) => { colData.push(value); });
-    // Sort by id descending so newest items show up first
-    colData.sort((a, b) => b.id.localeCompare(a.id));
-    setProducts(colData);
-
-    const galData = [];
-    await galleryDB.iterate((value, key) => { galData.push(value); });
-    galData.sort((a, b) => b.id.localeCompare(a.id));
-    setGallery(galData);
-
-    if (isInitial) setLoading(false);
-  };
 
   const resetForm = () => {
     setColForm({ id: '', name: '', price: '', category: 'Casual', image: '' });
@@ -65,28 +67,31 @@ const AdminDashboard = () => {
        return;
     }
 
-    const id = isEditing ? colForm.id : Date.now().toString();
-    const newProduct = { 
-      id, 
-      name: colForm.name.trim(), 
-      price: colForm.price, 
-      category: colForm.category, 
-      image: colForm.image 
-    };
-    
-    // Instant Optimistic UI Update (Matches user spec)
-    if (isEditing) {
-      setProducts(prev => prev.map(p => p.id === id ? newProduct : p));
-    } else {
-      setProducts(prev => [newProduct, ...prev]);
+    try {
+      if (isEditing) {
+        await setDoc(doc(db, "products", colForm.id), {
+          name: colForm.name.trim(),
+          price: colForm.price,
+          category: colForm.category,
+          image: colForm.image,
+          createdAt: colForm.createdAt || Date.now()
+        });
+        showToast('Product Updated Successfully');
+      } else {
+        await addDoc(collection(db, "products"), {
+          name: colForm.name.trim(),
+          price: colForm.price,
+          category: colForm.category,
+          image: colForm.image,
+          createdAt: Date.now()
+        });
+        showToast('Product Added Successfully');
+      }
+      resetForm();
+    } catch (error) {
+      console.error("Error saving product: ", error);
+      showToast('Error saving product');
     }
-
-    await collectionsDB.setItem(id, newProduct);
-    resetForm();
-    new BroadcastChannel('naaz_sync').postMessage('sync');
-    showToast(isEditing ? 'Product Updated Successfully' : 'Product Added Successfully');
-    // Ensure standard sync matches after save
-    loadData();
   };
 
   const handleEditCol = (product) => {
@@ -95,40 +100,29 @@ const AdminDashboard = () => {
   };
 
   const handleDelete = async (id) => {
-    // Trace 1: Click Event & Received ID
-    console.log("Trace: Delete Clicked | Received ID:", id);
-
     if (window.confirm('Are you sure you want to delete this product?')) {
-      // Trace 2: State Update Start
-      setProducts(prev => {
-        // Enforce String comparison to fix potential Number vs String bugs
-        const updatedList = prev.filter(product => String(product.id) !== String(id));
-        
-        // Trace 3: Post-Filter List
-        console.log("Trace: Filtered Product List Size:", updatedList.length);
-        return updatedList;
-      });
-
-      // Trace 4: Database Deletion Start
       try {
-        await collectionsDB.removeItem(String(id));
-        console.log("Trace: Database Removal Success for ID:", id);
+        await deleteDoc(doc(db, "products", id));
+        showToast('Product Deleted Successfully');
       } catch (err) {
-        console.error("Trace: Database Removal Error:", err);
+        console.error("Error deleting product:", err);
       }
-      
-      // Real-time synchronization across tabs
-      new BroadcastChannel('naaz_sync').postMessage('sync');
-      showToast('Product Deleted Successfully');
     }
   };
 
   const handleWipeCollections = async () => {
     if(window.confirm('Are you sure you want to delete all products?')) {
-      await collectionsDB.clear();
-      loadData();
-      new BroadcastChannel('naaz_sync').postMessage('sync');
-      showToast('All Products Deleted Successfully');
+      try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const batch = writeBatch(db);
+        querySnapshot.forEach((document) => {
+          batch.delete(document.ref);
+        });
+        await batch.commit();
+        showToast('All Products Deleted Successfully');
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -145,35 +139,47 @@ const AdminDashboard = () => {
       const files = Array.from(e.target.files);
       showToast(`Uploading ${files.length} image(s)...`);
       
-      for (let i = 0; i < files.length; i++) {
-        const base64 = await fileToBase64(files[i]);
-        // Add random string to ensure unique ID during fast bulk loops
-        const id = 'gal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-        await galleryDB.setItem(id, { id, image: base64 });
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const base64 = await fileToBase64(files[i]);
+          await addDoc(collection(db, "gallery"), { 
+            image: base64,
+            createdAt: Date.now() + i // slight offset to maintain order
+          });
+        }
+        showToast(`${files.length} Image(s) Uploaded Successfully`);
+      } catch (err) {
+        console.error(err);
       }
       
-      loadData();
-      new BroadcastChannel('naaz_sync').postMessage('sync');
-      showToast(`${files.length} Image(s) Uploaded Successfully`);
-      e.target.value = ''; // Reset input to allow re-uploading the same files if needed
+      e.target.value = ''; 
     }
   };
 
   const handleDeleteGal = async (id) => {
     if(window.confirm('Are you sure you want to delete this image?')) {
-      await galleryDB.removeItem(id);
-      loadData();
-      new BroadcastChannel('naaz_sync').postMessage('sync');
-      showToast('Image Deleted Successfully');
+      try {
+        await deleteDoc(doc(db, "gallery", id));
+        showToast('Image Deleted Successfully');
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
   const handleWipeGallery = async () => {
     if(window.confirm('⚠️ WARNING: Are you sure you want to totally WIPE all gallery images?')) {
-      await galleryDB.clear();
-      loadData();
-      new BroadcastChannel('naaz_sync').postMessage('sync');
-      showToast('Gallery Wiped Successfully');
+      try {
+        const querySnapshot = await getDocs(collection(db, "gallery"));
+        const batch = writeBatch(db);
+        querySnapshot.forEach((document) => {
+          batch.delete(document.ref);
+        });
+        await batch.commit();
+        showToast('Gallery Wiped Successfully');
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -181,11 +187,9 @@ const AdminDashboard = () => {
   const handleNuclearWipe = async () => {
     if(window.confirm('⚠️ Are you sure? This action cannot be undone.')) {
       if(window.confirm('WARNING: This will permanently delete ALL products and ALL images. Are you absolutely certain?')) {
-        await collectionsDB.clear();
-        await galleryDB.clear();
+        await handleWipeCollections();
+        await handleWipeGallery();
         localStorage.clear();
-        loadData();
-        new BroadcastChannel('naaz_sync').postMessage('sync');
         showToast('Entire Website Data Cleared');
       }
     }
@@ -367,9 +371,10 @@ const AdminDashboard = () => {
                         <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                            if (e.target.files && e.target.files[0]) {
                               const base64 = await fileToBase64(e.target.files[0]);
-                              await galleryDB.setItem(item.id, { id: item.id, image: base64 });
-                              loadData();
-                              new BroadcastChannel('naaz_sync').postMessage('sync');
+                              await setDoc(doc(db, "gallery", item.id), { 
+                                 image: base64,
+                                 createdAt: item.createdAt || Date.now() 
+                              });
                               showToast('Image Replaced Successfully');
                            }
                         }} />

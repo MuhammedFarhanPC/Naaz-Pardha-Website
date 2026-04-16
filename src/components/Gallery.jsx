@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import { galleryDB, initDB } from '../db';
+import { db } from '../firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 const Gallery = () => {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -9,27 +10,15 @@ const Gallery = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadGallery();
-
-    const bc = new BroadcastChannel('naaz_sync');
-    bc.onmessage = (event) => {
-      if (event.data === 'sync') {
-        loadGallery();
-      }
-    };
-
-    return () => bc.close();
-  }, []);
-
-  const loadGallery = async () => {
-    await initDB();
-    const data = [];
-    await galleryDB.iterate((value) => {
-      data.push(value.image);
+    const unsub = onSnapshot(collection(db, "gallery"), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setGalleryImages(data.map(item => item.image));
+      setLoading(false);
     });
-    setGalleryImages(data);
-    setLoading(false);
-  };
+
+    return () => unsub();
+  }, []);
 
   return (
     <section id="gallery" className="py-24 px-4 sm:px-6 lg:px-8 bg-brand-pastel dark:bg-brand-black/95 transition-colors">

@@ -1,34 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { collectionsDB, initDB } from '../db';
+import { db } from '../firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 const Collection = () => {
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadCollections();
-
-    // Real-time synchronization listener
-    const bc = new BroadcastChannel('naaz_sync');
-    bc.onmessage = (event) => {
-      if (event.data === 'sync') {
-        loadCollections();
-      }
-    };
-
-    return () => bc.close();
-  }, []);
-
-  const loadCollections = async () => {
-    await initDB();
-    const data = [];
-    await collectionsDB.iterate((value) => {
-      data.push(value);
+    const unsub = onSnapshot(collection(db, "products"), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setCollections(data);
+      setLoading(false);
     });
-    setCollections(data);
-    setLoading(false);
-  };
+
+    return () => unsub();
+  }, []);
 
   return (
     <section id="collection" className="py-24 px-4 sm:px-6 lg:px-8 bg-brand-pastel dark:bg-gray-900 transition-colors">
