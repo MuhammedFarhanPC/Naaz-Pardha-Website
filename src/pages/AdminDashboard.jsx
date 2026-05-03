@@ -27,7 +27,11 @@ const AdminDashboard = () => {
     // Real-time listener for products
     const unsubProducts = onSnapshot(collection(db, "products"), (snapshot) => {
       const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      prods.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by newest
+      prods.sort((a, b) => {
+        const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt || 0);
+        const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt || 0);
+        return dateB - dateA;
+      });
       setProducts(prods);
       setLoading(false);
     });
@@ -35,7 +39,11 @@ const AdminDashboard = () => {
     // Real-time listener for gallery
     const unsubGallery = onSnapshot(collection(db, "gallery"), (snapshot) => {
       const gals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      gals.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      gals.sort((a, b) => {
+        const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt || 0);
+        const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt || 0);
+        return dateB - dateA;
+      });
       setGallery(gals);
     });
 

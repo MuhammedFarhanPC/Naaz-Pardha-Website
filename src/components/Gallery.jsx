@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 const Gallery = () => {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -10,20 +10,27 @@ const Gallery = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchGallery = async () => {
+    const unsub = onSnapshot(collection(db, "gallery"), (snapshot) => {
       try {
-        const querySnapshot = await getDocs(collection(db, "gallery"));
-        const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Robust sorting
+        data.sort((a, b) => {
+          const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt || 0);
+          const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt || 0);
+          return dateB - dateA;
+        });
         setGalleryImages(data.map(item => item.image));
       } catch (error) {
-        console.error("Error fetching gallery: ", error);
+        console.error("Error processing gallery: ", error);
       } finally {
         setLoading(false);
       }
-    };
+    }, (error) => {
+      console.error("Error fetching gallery: ", error);
+      setLoading(false);
+    });
 
-    fetchGallery();
+    return () => unsub();
   }, []);
 
   return (
