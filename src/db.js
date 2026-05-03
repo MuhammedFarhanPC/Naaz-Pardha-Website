@@ -9,7 +9,7 @@ export const fileToBase64 = (file) => {
 };
 
 // Compress image to avoid Firestore 1MB limit
-export const compressImage = (file, maxWidth = 800, quality = 0.7) => {
+export const compressImage = (file, maxWidth = 600, quality = 0.6) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -21,7 +21,6 @@ export const compressImage = (file, maxWidth = 800, quality = 0.7) => {
                 let width = img.width;
                 let height = img.height;
 
-                // Only resize if width is greater than maxWidth
                 if (width > maxWidth) {
                     height = (maxWidth / width) * height;
                     width = maxWidth;
@@ -33,8 +32,14 @@ export const compressImage = (file, maxWidth = 800, quality = 0.7) => {
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                // Return compressed base64
-                resolve(canvas.toDataURL('image/jpeg', quality));
+                const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                
+                if (compressedBase64.length > 1000000) {
+                    // If still too large, try even lower quality
+                    resolve(canvas.toDataURL('image/jpeg', 0.4));
+                } else {
+                    resolve(compressedBase64);
+                }
             };
             img.onerror = (error) => reject(error);
         };

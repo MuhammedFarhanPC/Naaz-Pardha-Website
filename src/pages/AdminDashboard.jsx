@@ -81,6 +81,12 @@ const AdminDashboard = () => {
        return;
     }
 
+    // Final check for image size (Firestore limit is 1MB)
+    if (colForm.image && colForm.image.length > 1048487) {
+      alert("Error: Image is too large (over 1MB). Even after compression, this image cannot be saved to Firestore. Please use a smaller image file.");
+      return;
+    }
+
     try {
       if (isEditing) {
         await setDoc(doc(db, "products", colForm.id), {
