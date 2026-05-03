@@ -64,6 +64,12 @@ const AdminDashboard = () => {
   const handleColSubmit = async (e) => {
     e.preventDefault();
 
+    // Validation
+    if (!colForm.name.trim() || !colForm.price) {
+      alert("Error: Product Name and Price are required!");
+      return;
+    }
+
     // Prevent duplicate product names
     const nameTrimmed = colForm.name.trim().toLowerCase();
     const isDuplicate = products.some(p => 
@@ -82,7 +88,7 @@ const AdminDashboard = () => {
           price: colForm.price,
           category: colForm.category,
           image: colForm.image,
-          createdAt: colForm.createdAt || Date.now()
+          createdAt: colForm.createdAt || new Date()
         });
         showToast('Product Updated Successfully');
       } else {
@@ -91,14 +97,14 @@ const AdminDashboard = () => {
           price: colForm.price,
           category: colForm.category,
           image: colForm.image,
-          createdAt: Date.now()
+          createdAt: new Date()
         });
         showToast('Product Added Successfully');
       }
       resetForm();
     } catch (error) {
       console.error("Error saving product: ", error);
-      showToast('Error saving product');
+      alert("Error saving product: " + error.message);
     }
   };
 
