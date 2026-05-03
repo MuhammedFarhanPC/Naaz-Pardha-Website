@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { fileToBase64 } from '../db';
+import { compressImage } from '../db';
 import { db } from '../firebase';
 import { collection, addDoc, deleteDoc, doc, setDoc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 import { LogOut, Image as ImageIcon, Package, Trash2, Edit3, Plus, CheckCircle } from 'lucide-react';
@@ -142,8 +142,13 @@ const AdminDashboard = () => {
 
   const handleColImage = async (e) => {
     if (e.target.files && e.target.files[0]) {
-      const base64 = await fileToBase64(e.target.files[0]);
-      setColForm({ ...colForm, image: base64 });
+      try {
+        const base64 = await compressImage(e.target.files[0]);
+        setColForm({ ...colForm, image: base64 });
+      } catch (err) {
+        console.error("Error compressing image:", err);
+        alert("Error processing image");
+      }
     }
   };
 
@@ -155,15 +160,16 @@ const AdminDashboard = () => {
       
       try {
         for (let i = 0; i < files.length; i++) {
-          const base64 = await fileToBase64(files[i]);
+          const base64 = await compressImage(files[i]);
           await addDoc(collection(db, "gallery"), { 
             image: base64,
-            createdAt: Date.now() + i // slight offset to maintain order
+            createdAt: new Date()
           });
         }
         showToast(`${files.length} Image(s) Uploaded Successfully`);
       } catch (err) {
         console.error(err);
+        alert("Error uploading gallery: " + err.message);
       }
       
       e.target.value = ''; 
@@ -384,7 +390,7 @@ const AdminDashboard = () => {
                         <span>Replace</span>
                         <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                            if (e.target.files && e.target.files[0]) {
-                              const base64 = await fileToBase64(e.target.files[0]);
+                              const base64 = await compressImage(e.target.files[0]);
                               await setDoc(doc(db, "gallery", item.id), { 
                                  image: base64,
                                  createdAt: item.createdAt || Date.now() 
