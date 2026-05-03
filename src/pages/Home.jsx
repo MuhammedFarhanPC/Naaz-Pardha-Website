@@ -7,6 +7,7 @@ import Features from '../components/Features';
 import Gallery from '../components/Gallery';
 import Testimonials from '../components/Testimonials';
 import Contact from '../components/Contact';
+import SEOContent from '../components/SEOContent';
 import Footer from '../components/Footer';
 import FloatingWhatsApp from '../components/FloatingWhatsApp';
 
@@ -33,6 +34,7 @@ const Home = () => {
       <Gallery />
       <Testimonials />
       <Contact />
+      <SEOContent />
       <Footer />
       <FloatingWhatsApp />
     </div>

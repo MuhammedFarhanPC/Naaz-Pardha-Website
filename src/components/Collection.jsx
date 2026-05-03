@@ -79,7 +79,8 @@ const Collection = () => {
                   {item.image ? (
                      <motion.img 
                        src={item.image} 
-                       alt={item.name} 
+                       alt={`${item.name} - ${item.category} Pardha Collection`}
+                       loading="lazy"
                        className="w-full h-full object-cover"
                        animate={{ scale: [1, 1.05, 1] }}
                        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}

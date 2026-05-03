@@ -78,7 +78,8 @@ const Gallery = () => {
               >
                 <img 
                   src={src} 
-                  alt={`Gallery image ${index + 1}`} 
+                  alt={`Premium Pardha Gallery Image ${index + 1} - Naaz Pardha Kerala`} 
+                  loading="lazy"
                   className="w-full h-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-110 group-hover:brightness-90 opacity-90 group-hover:opacity-100"
                 />
                 <div className="absolute inset-0 bg-brand-black/0 group-hover:bg-brand-black/20 transition-colors duration-300 flex items-center justify-center">
